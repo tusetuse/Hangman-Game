@@ -45,19 +45,10 @@ namespace Hangman_app
             try
             {
                 string connectionString = "mongodb://root:ivana@localhost:27017/?directConnection=true";
-                // Connect to MongoDB
                 MongoClient client = new MongoClient(connectionString);
-
-                // Access HangManGame database
                 IMongoDatabase database = client.GetDatabase("HangManGame");
-
-                // Access guess collection
                 IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("guess");
-
-                // Retrieve the first document from the collection
                 var document = collection.Find(new BsonDocument()).FirstOrDefault();
-
-                // Extract words array from the document
                 if (document != null && document.Contains("word") && document["word"].IsBsonArray)
                 {
                     var wordsArray = document["word"].AsBsonArray;
