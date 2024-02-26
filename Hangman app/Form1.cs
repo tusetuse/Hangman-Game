@@ -1,30 +1,81 @@
-using Microsoft.VisualBasic.ApplicationServices;
 using System;
+using System.Linq;
+using System.Windows.Forms;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace Hangman_app
 {
     public partial class Form1 : Form
     {
-        private string[] words = new string[] { "example", "mystery", "hangman", "challenge", "programming", "code", "debug" };
+        private string[] words;
         private string currentWord = "";
         private string displayWord = "";
         private int incorrectGuesses = 0;
+
         public Form1()
         {
             InitializeComponent();
             InitializeGame();
         }
+
         private void InitializeGame()
         {
-            Random rand = new Random();
-            int index = rand.Next(words.Length);
-            currentWord = words[index];
+            RetrieveWordsFromMongoDB();
 
-            displayWord = new string('_', currentWord.Length);
-            label1.Text = String.Join(" ", displayWord.ToCharArray());
-            incorrectGuesses = 0;
-            UpdateHangmanImage(0); // Show initial hangman state
+            if (words != null && words.Length > 0)
+            {
+                Random rand = new Random();
+                int index = rand.Next(words.Length);
+                currentWord = words[index];
+
+                displayWord = new string('_', currentWord.Length);
+                label1.Text = String.Join(" ", displayWord.ToCharArray());
+                incorrectGuesses = 0;
+                UpdateHangmanImage(0);
+            }
+            else
+            {
+                MessageBox.Show("Error: No words retrieved from MongoDB.");
+            }
         }
+
+        private void RetrieveWordsFromMongoDB()
+        {
+            try
+            {
+                string connectionString = "mongodb://root:ivana@localhost:27017/?directConnection=true";
+                // Connect to MongoDB
+                MongoClient client = new MongoClient(connectionString);
+
+                // Access HangManGame database
+                IMongoDatabase database = client.GetDatabase("HangManGame");
+
+                // Access guess collection
+                IMongoCollection<BsonDocument> collection = database.GetCollection<BsonDocument>("guess");
+
+                // Retrieve the first document from the collection
+                var document = collection.Find(new BsonDocument()).FirstOrDefault();
+
+                // Extract words array from the document
+                if (document != null && document.Contains("word") && document["word"].IsBsonArray)
+                {
+                    var wordsArray = document["word"].AsBsonArray;
+                    words = wordsArray.Select(word => word.ToString()).ToArray();
+                }
+                else
+                {
+                    MessageBox.Show("Error: Invalid document structure or no words found.");
+                    words = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error retrieving words from MongoDB: {ex.Message}");
+                words = null;
+            }
+        }
+
 
         public void EnterGuess()
         {
@@ -36,17 +87,19 @@ namespace Hangman_app
             textBox1.Clear();
             textBox1.Focus();
         }
+
         private void button1_Click(object sender, EventArgs e)
         {
             EnterGuess();
         }
+
         private void textBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
             {
                 e.SuppressKeyPress = true;
                 EnterGuess();
-            }    
+            }
         }
 
         private void ProcessGuess(char guess)
@@ -67,7 +120,7 @@ namespace Hangman_app
                 if (!displayWord.Contains("_"))
                 {
                     MessageBox.Show("Congratulations, you've won!");
-                    InitializeGame(); // Reset the game
+                    InitializeGame();
                 }
             }
             else
@@ -77,7 +130,7 @@ namespace Hangman_app
                 if (incorrectGuesses >= 12)
                 {
                     MessageBox.Show($"Sorry, you've lost! The word was: {currentWord}");
-                    InitializeGame();// Reset the game
+                    InitializeGame();
                 }
             }
         }
